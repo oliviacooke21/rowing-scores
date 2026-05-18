@@ -19,7 +19,7 @@ PATRIOT_LEAGUE_SCORING = {
 }
 
 # ============================================================
-# CONFERENCES CONFIG - add more here later
+# CONFERENCES CONFIG
 # ============================================================
 CONFERENCES = {
     'patriot_league': {
@@ -30,7 +30,7 @@ CONFERENCES = {
 }
 
 # ============================================================
-# RACE NAME KEYWORDS - maps site text to our scoring keys
+# RACE NAME KEYWORDS
 # ============================================================
 RACE_KEYWORDS = {
     'V8 Grand Final':   ['v8 grand', 'varsity eight grand', 'varsity 8 grand', 'v8 grand final'],
@@ -59,20 +59,23 @@ def scrape_conference(conf_key):
     team_scores = {}
     race_results_found = {}
 
-    headers = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
-    "Referer": "https://results.regattatiming.com/",
-    "Upgrade-Insecure-Requests": "1",
-}
-    }
+    # ---- SESSION WITH BROWSER-LIKE HEADERS ----
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    })
 
     # ---- FETCH PAGE ----
     try:
-        response = requests.get(url, headers=headers, timeout=20)
+        # First visit homepage to get cookies
+        session.get("https://results.regattatiming.com", timeout=20)
+        # Then fetch actual results
+        response = session.get(url, timeout=20)
         response.raise_for_status()
         debug_log.append(f"SUCCESS: Fetched {url}")
         debug_log.append(f"Status code: {response.status_code}")
@@ -117,7 +120,7 @@ def scrape_conference(conf_key):
             debug_log.append(f"  Caption: {cap_text}")
             race_name = match_race_name(cap_text)
 
-        # Check preceding headings/bold
+        # Check preceding headings
         for tag_name in ['h1','h2','h3','h4','h5','b','strong']:
             prev = table.find_previous(tag_name)
             if prev:
@@ -127,7 +130,7 @@ def scrape_conference(conf_key):
                     if not race_name:
                         race_name = match_race_name(prev_text)
 
-        # Print first 6 rows of each table for inspection
+        # Print first 6 rows for inspection
         for j, row in enumerate(rows[:6]):
             cells = [c.get_text(strip=True) for c in row.find_all(['td','th'])]
             if any(cells):
@@ -152,47 +155,4 @@ def scrape_conference(conf_key):
         for row in rows:
             if not any(row):
                 continue
-            if place > max(scoring_table.keys()):
-                break
-
-            # Find team name - first non-numeric, non-empty cell
-            team = None
-            for cell in row:
-                if cell and len(cell) > 1 and not cell.replace('.','').replace(':','').isdigit():
-                    team = cell
-                    break
-
-            if team and place in scoring_table:
-                points = scoring_table[place]
-                team_scores[team] = team_scores.get(team, 0) + points
-                debug_log.append(f"SCORED: {team} | {race_name} | Place {place} | {points} pts")
-                place += 1
-
-    # ---- SORT SCORES ----
-    sorted_scores = dict(sorted(team_scores.items(), key=lambda x: x[1], reverse=True))
-
-    return {
-        'conference': conf['name'],
-        'scores': sorted_scores,
-        'race_results': race_results_found,
-        'debug': debug_log,
-        'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    }
-
-def scrape_all():
-    all_data = {}
-    for conf_key in CONFERENCES:
-        print(f"Scraping {conf_key}...")
-        all_data[conf_key] = scrape_conference(conf_key)
-        print(f"Scores: {all_data[conf_key]['scores']}")
-
-    # Save to JSON file
-    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scores.json')
-    with open(data_path, 'w') as f:
-        json.dump(all_data, f, indent=2)
-
-    print(f"Saved to {data_path}")
-    return all_data
-
-if __name__ == '__main__':
-    scrape_all()
+            if place
